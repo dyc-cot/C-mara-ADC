@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ADC · Cámara con geolocalización</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1c1f24">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cámara ADC">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -168,6 +176,15 @@
   </header>
 
   <section>
+    <div class="card hidden" id="installCard">
+      <p class="card-label">Instalar app</p>
+      <p style="font-size:13px;color:var(--steel);margin:0 0 10px;">Instala esta página como app para abrirla directo desde tu pantalla de inicio.</p>
+      <button class="btn btn-dark" id="installBtn">Instalar app</button>
+    </div>
+    <div class="card hidden" id="iosCard">
+      <p class="card-label">Instalar en iPhone</p>
+      <p style="font-size:13px;color:var(--steel);margin:0;">Toca el botón <strong>Compartir</strong> (cuadrado con flecha) en Safari y elige <strong>"Agregar a pantalla de inicio"</strong>.</p>
+    </div>
     <div class="card">
       <p class="card-label">Datos del usuario</p>
       <div class="row">
@@ -391,6 +408,35 @@ startBtn.addEventListener('click', startCamera);
 shutterBtn.addEventListener('click', takePhoto);
 retakeBtn.addEventListener('click', retake);
 downloadBtn.addEventListener('click', download);
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  $('installCard').classList.remove('hidden');
+});
+$('installBtn').addEventListener('click', async () => {
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  $('installCard').classList.add('hidden');
+});
+window.addEventListener('appinstalled', () => {
+  $('installCard').classList.add('hidden');
+});
+
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+if(isIOS && !isStandalone){
+  $('iosCard').classList.remove('hidden');
+}
 </script>
 </body>
 </html>
