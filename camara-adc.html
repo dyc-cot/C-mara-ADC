@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADC · Cámara con geolocalización</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --charcoal:#1c1f24;
+    --charcoal-2:#262a31;
+    --concrete:#e9e7e1;
+    --steel:#5c6470;
+    --safety:#f2b705;
+    --safety-dark:#b98a02;
+    --white:#faf9f6;
+    --danger:#d94f30;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--concrete);
+    font-family:'Barlow', sans-serif;
+    color:var(--charcoal);
+    -webkit-tap-highlight-color:transparent;
+  }
+  .wrap{max-width:520px;margin:0 auto;min-height:100vh;background:var(--white);box-shadow:0 0 40px rgba(0,0,0,.08);}
+  header{
+    background:var(--charcoal);
+    padding:22px 20px 18px;
+    border-bottom:5px solid var(--safety);
+  }
+  header h1{
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:700;
+    font-size:26px;
+    letter-spacing:.5px;
+    color:var(--white);
+    margin:0;
+    text-transform:uppercase;
+    line-height:1.1;
+  }
+  header h1 span{color:var(--safety);}
+  header p{
+    margin:4px 0 0;
+    color:#b9bcc2;
+    font-size:13px;
+    letter-spacing:.3px;
+  }
+  section{padding:18px 20px;}
+  .card{
+    background:var(--white);
+    border:1px solid #ddd9d0;
+    border-radius:4px;
+    padding:14px 16px;
+    margin-bottom:16px;
+  }
+  .card-label{
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:700;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:.8px;
+    color:var(--steel);
+    margin:0 0 10px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .card-label::before{
+    content:'';
+    width:8px;height:8px;
+    background:var(--safety);
+    display:inline-block;
+  }
+  .row{display:flex;gap:10px;margin-bottom:10px;}
+  .row:last-child{margin-bottom:0;}
+  input[type=text]{
+    width:100%;
+    border:1px solid #cfcbc2;
+    border-radius:3px;
+    padding:10px 11px;
+    font-family:'Barlow',sans-serif;
+    font-size:15px;
+    background:#fcfbf9;
+    color:var(--charcoal);
+  }
+  input[type=text]:focus{outline:2px solid var(--safety);border-color:var(--safety-dark);}
+  label{font-size:12px;color:var(--steel);display:block;margin-bottom:4px;font-weight:500;}
+  .field{flex:1;}
+  .cam-box{
+    position:relative;
+    width:100%;
+    aspect-ratio:3/4;
+    background:var(--charcoal);
+    border-radius:4px;
+    overflow:hidden;
+  }
+  video, canvas.preview, img.preview{
+    width:100%;height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .cam-placeholder{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    color:#7d838d;font-size:14px;gap:10px;text-align:center;padding:20px;
+  }
+  .status{
+    font-size:12px;
+    color:var(--steel);
+    margin-top:8px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    min-height:16px;
+  }
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--steel);flex-shrink:0;}
+  .dot.ok{background:#3f8f5c;}
+  .dot.wait{background:var(--safety);animation:pulse 1.2s infinite;}
+  .dot.err{background:var(--danger);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .btn{
+    width:100%;
+    border:none;
+    border-radius:3px;
+    padding:14px;
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:700;
+    font-size:17px;
+    text-transform:uppercase;
+    letter-spacing:.6px;
+    cursor:pointer;
+  }
+  .btn-primary{background:var(--safety);color:var(--charcoal);}
+  .btn-primary:active{background:var(--safety-dark);}
+  .btn-dark{background:var(--charcoal);color:var(--white);}
+  .btn-dark:active{background:var(--charcoal-2);}
+  .btn-outline{background:transparent;color:var(--charcoal);border:1px solid #cfcbc2;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .btn-group{display:flex;gap:10px;margin-top:12px;}
+  .btn-group .btn{flex:1;}
+  .shutter-row{display:flex;justify-content:center;margin-top:14px;}
+  .shutter{
+    width:66px;height:66px;
+    border-radius:50%;
+    background:var(--white);
+    border:4px solid var(--safety);
+    cursor:pointer;
+  }
+  .shutter:active{transform:scale(.94);}
+  .shutter:disabled{opacity:.4;}
+  footer{
+    padding:10px 20px 28px;
+    text-align:center;
+    font-size:11px;
+    color:#a7a49c;
+  }
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Alexander Diseño <span>&amp;</span> Construcción</h1>
+    <p>Registro fotográfico con fecha, hora y ubicación</p>
+  </header>
+
+  <section>
+    <div class="card">
+      <p class="card-label">Datos del usuario</p>
+      <div class="row">
+        <div class="field">
+          <label for="nombre">Nombre</label>
+          <input type="text" id="nombre" placeholder="Nombre y apellido">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="cargo">Cargo</label>
+          <input type="text" id="cargo" placeholder="Ej. Electricista industrial">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-label">Cámara</p>
+      <div class="cam-box" id="camBox">
+        <div class="cam-placeholder" id="camPlaceholder">
+          <span>Toca "Activar cámara" para comenzar</span>
+        </div>
+        <video id="video" autoplay playsinline muted class="hidden"></video>
+        <img id="resultImg" class="preview hidden">
+      </div>
+      <div class="status" id="gpsStatus"><span class="dot" id="gpsDot"></span><span id="gpsText">Ubicación no solicitada</span></div>
+
+      <div id="startRow">
+        <button class="btn btn-dark" id="startBtn" style="margin-top:12px;">Activar cámara</button>
+      </div>
+
+      <div class="shutter-row hidden" id="shutterRow">
+        <button class="shutter" id="shutterBtn" aria-label="Tomar foto"></button>
+      </div>
+
+      <div class="btn-group hidden" id="resultRow">
+        <button class="btn btn-outline" id="retakeBtn">Nueva foto</button>
+        <button class="btn btn-primary" id="downloadBtn">Descargar</button>
+      </div>
+    </div>
+  </section>
+
+  <footer>Funciona 100% en tu navegador · no se sube ninguna foto a ningún servidor</footer>
+</div>
+
+<canvas id="workCanvas" class="hidden"></canvas>
+
+<script>
+const $ = id => document.getElementById(id);
+const nombreInput = $('nombre'), cargoInput = $('cargo');
+const video = $('video'), camPlaceholder = $('camPlaceholder'), resultImg = $('resultImg');
+const startBtn = $('startBtn'), startRow = $('startRow');
+const shutterRow = $('shutterRow'), shutterBtn = $('shutterBtn');
+const resultRow = $('resultRow'), retakeBtn = $('retakeBtn'), downloadBtn = $('downloadBtn');
+const gpsDot = $('gpsDot'), gpsText = $('gpsText');
+const workCanvas = $('workCanvas');
+
+nombreInput.value = localStorage.getItem('adc_nombre') || '';
+cargoInput.value = localStorage.getItem('adc_cargo') || '';
+nombreInput.addEventListener('input', () => localStorage.setItem('adc_nombre', nombreInput.value));
+cargoInput.addEventListener('input', () => localStorage.setItem('adc_cargo', cargoInput.value));
+
+let stream = null;
+let lastCoords = null;
+let lastAddress = '';
+let watchId = null;
+
+function setGps(state, text){
+  gpsDot.className = 'dot ' + state;
+  gpsText.textContent = text;
+}
+
+function startWatchingLocation(){
+  if(!('geolocation' in navigator)){
+    setGps('err', 'Geolocalización no disponible en este navegador');
+    return;
+  }
+  setGps('wait', 'Obteniendo ubicación...');
+  watchId = navigator.geolocation.watchPosition(async pos => {
+    lastCoords = pos.coords;
+    setGps('ok', formatCoords(pos.coords) + ' · precisión ' + Math.round(pos.coords.accuracy) + 'm');
+    fetchAddress(pos.coords.latitude, pos.coords.longitude);
+  }, err => {
+    setGps('err', 'No se pudo obtener ubicación (' + err.message + ')');
+  }, { enableHighAccuracy:true, maximumAge:10000, timeout:15000 });
+}
+
+function formatCoords(c){
+  const latDir = c.latitude >= 0 ? 'N' : 'S';
+  const lonDir = c.longitude >= 0 ? 'E' : 'W';
+  return Math.abs(c.latitude).toFixed(4) + latDir + ' ' + Math.abs(c.longitude).toFixed(4) + lonDir;
+}
+
+async function fetchAddress(lat, lon){
+  try{
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1`);
+    const data = await res.json();
+    if(data && data.address){
+      const a = data.address;
+      const parts = [a.road, a.suburb || a.neighbourhood, a.city || a.town || a.village, a.state].filter(Boolean);
+      lastAddress = parts.join(', ');
+    }
+  }catch(e){
+    lastAddress = '';
+  }
+}
+
+async function startCamera(){
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment', width:{ideal:1920}, height:{ideal:1440} }, audio:false });
+    video.srcObject = stream;
+    video.classList.remove('hidden');
+    camPlaceholder.classList.add('hidden');
+    startRow.classList.add('hidden');
+    shutterRow.classList.remove('hidden');
+    startWatchingLocation();
+  }catch(e){
+    camPlaceholder.textContent = 'No se pudo acceder a la cámara: ' + e.message;
+  }
+}
+
+function wrapText(ctx, text, maxWidth){
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for(const w of words){
+    const test = line ? line + ' ' + w : w;
+    if(ctx.measureText(test).width > maxWidth && line){
+      lines.push(line);
+      line = w;
+    } else {
+      line = test;
+    }
+  }
+  if(line) lines.push(line);
+  return lines;
+}
+
+function takePhoto(){
+  const vw = video.videoWidth, vh = video.videoHeight;
+  workCanvas.width = vw;
+  workCanvas.height = vh;
+  const ctx = workCanvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, vw, vh);
+
+  const scale = vw / 1000;
+  const pad = 26 * scale;
+
+  // top-left company banner
+  ctx.font = `700 ${34*scale}px 'Barlow Condensed', sans-serif`;
+  const brandLine1 = 'ALEXANDER DISEÑO & CONSTRUCCIÓN';
+  const bannerLines = wrapText(ctx, brandLine1, vw * 0.62);
+  const bannerLineH = 40 * scale;
+  const bannerW = Math.max(...bannerLines.map(l => ctx.measureText(l).width)) + pad*2;
+  const bannerH = bannerLines.length * bannerLineH + pad*1.6;
+  ctx.fillStyle = 'rgba(28,31,36,0.82)';
+  ctx.fillRect(0, 0, bannerW, bannerH);
+  ctx.fillStyle = '#f2b705';
+  ctx.fillRect(0, 0, 6*scale, bannerH);
+  ctx.fillStyle = '#faf9f6';
+  bannerLines.forEach((l,i) => ctx.fillText(l, pad + 4*scale, pad + bannerLineH*(i+0.7)));
+
+  // bottom-right info box
+  const now = new Date();
+  const fecha = now.toLocaleDateString('es-PE') + ' ' + now.toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'});
+  const coordsTxt = lastCoords ? formatCoords(lastCoords) : 'Ubicación no disponible';
+  const nombre = nombreInput.value.trim();
+  const cargo = cargoInput.value.trim();
+
+  const infoLines = [fecha, coordsTxt];
+  if(lastAddress) infoLines.push(lastAddress);
+  if(nombre) infoLines.push(nombre);
+  if(cargo) infoLines.push(cargo);
+
+  ctx.font = `500 ${24*scale}px 'Barlow', sans-serif`;
+  let maxLineW = 0;
+  const wrapped = [];
+  infoLines.forEach(l => {
+    const ls = wrapText(ctx, l, vw*0.55);
+    ls.forEach(x => { wrapped.push(x); maxLineW = Math.max(maxLineW, ctx.measureText(x).width); });
+  });
+
+  const lineH = 30*scale;
+  const boxW = maxLineW + pad*2;
+  const boxH = wrapped.length*lineH + pad*1.4;
+  const boxX = vw - boxW;
+  const boxY = vh - boxH;
+  ctx.fillStyle = 'rgba(28,31,36,0.82)';
+  ctx.fillRect(boxX, boxY, boxW, boxH);
+  ctx.fillStyle = '#faf9f6';
+  wrapped.forEach((l,i) => {
+    const w = ctx.measureText(l).width;
+    ctx.fillText(l, vw - pad - w, boxY + pad*0.8 + lineH*(i+0.7));
+  });
+
+  const dataUrl = workCanvas.toDataURL('image/jpeg', 0.92);
+  resultImg.src = dataUrl;
+  resultImg.classList.remove('hidden');
+  video.classList.add('hidden');
+  shutterRow.classList.add('hidden');
+  resultRow.classList.remove('hidden');
+}
+
+function retake(){
+  resultImg.classList.add('hidden');
+  video.classList.remove('hidden');
+  shutterRow.classList.remove('hidden');
+  resultRow.classList.add('hidden');
+}
+
+function download(){
+  const now = new Date();
+  const stamp = now.toISOString().replace(/[:T]/g,'-').slice(0,16);
+  const a = document.createElement('a');
+  a.href = resultImg.src;
+  a.download = `ADC_${stamp}.jpg`;
+  a.click();
+}
+
+startBtn.addEventListener('click', startCamera);
+shutterBtn.addEventListener('click', takePhoto);
+retakeBtn.addEventListener('click', retake);
+downloadBtn.addEventListener('click', download);
+</script>
+</body>
+</html>
